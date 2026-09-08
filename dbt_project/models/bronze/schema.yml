@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: stg_placement_students
+    description: "Staging view for students data"
+    columns:
+      - name: student_id
+        description: "Primary key for students"
+        tests:
+          - not_null
+      - name: cgpa
+        tests:
+          - not_null
+
+  - name: stg_placement_colleges
+    description: "Staging view for colleges data"
+    columns:
+      - name: college_id
+        description: "Primary key for colleges"
+        tests:
+          - not_null
+
+  - name: stg_placement_companies
+    description: "Staging view for companies data"
+    columns:
+      - name: company_id
+        description: "Primary key for companies"
+        tests:
+          - not_null
+
+  - name: stg_placement_offers
+    description: "Staging view for offers data"
+    columns:
+      - name: offer_id
+        tests:
+          - not_null
+      - name: offer_line_id
+        tests:
+          - not_null
+      - name: student_id
+        tests:
+          - not_null
+      - name: college_id
+        tests:
+          - not_null
+      - name: company_id
+        tests:
+          - not_null
+      - name: ctc_lpa
+        tests:
+          - not_null
+      - name: offer_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['OFFERED', 'ACCEPTED', 'JOINED', 'REJECTED', 'WITHDRAWN']

@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: dim_student
+    description: "SCD Type 2 Student Dimension"
+    columns:
+      - name: sk_student
+        tests:
+          - unique
+          - not_null
+      - name: student_id
+        tests:
+          - not_null
+      - name: hash_diff
+        tests:
+          - not_null
+      - name: eff_start_ts
+        tests:
+          - not_null
+      - name: eff_end_ts
+        tests:
+          - not_null
+      - name: is_current
+        tests:
+          - not_null
+
+  - name: dim_company
+    description: "SCD Type 2 Company Dimension"
+    columns:
+      - name: sk_company
+        tests:
+          - unique
+          - not_null
+      - name: company_id
+        tests:
+          - not_null
+      - name: hash_diff
+        tests:
+          - not_null
+      - name: eff_start_ts
+        tests:
+          - not_null
+      - name: eff_end_ts
+        tests:
+          - not_null
+      - name: is_current
+        tests:
+          - not_null
+
+  - name: dim_college
+    description: "Type 1 College Dimension"
+    columns:
+      - name: sk_college
+        tests:
+          - unique
+          - not_null
+      - name: college_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Calendar Date Dimension"
+    columns:
+      - name: sk_date
+        tests:
+          - unique
+          - not_null
+      - name: date_value
+        tests:
+          - unique
+          - not_null

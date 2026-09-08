@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: v_executive_summary
+    description: "High-level KPI metrics view for executive placement dashboard"
+    columns:
+      - name: total_offers
+        tests:
+          - not_null
+      - name: avg_ctc
+        tests:
+          - not_null
+
+  - name: v_college_performance
+    description: "Aggregated placement performance by college, tier, and program"
+    columns:
+      - name: college_id
+        tests:
+          - not_null
+      - name: college_name
+        tests:
+          - not_null
+
+  - name: v_company_insights
+    description: "Recruiter hiring metrics, acceptance rates, and CTC by company"
+    columns:
+      - name: company_id
+        tests:
+          - not_null
+      - name: company_name
+        tests:
+          - not_null
+
+  - name: v_offer_explorer
+    description: "Drilldown view for offer exploration with all dimension attributes"
+    columns:
+      - name: offer_id
+        tests:
+          - not_null
+      - name: student_id
+        tests:
+          - not_null
+      - name: ctc_lpa
+        tests:
+          - not_null

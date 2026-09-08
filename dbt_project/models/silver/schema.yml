@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: int_students_cleaned
+    description: "Cleaned and deduplicated students in Silver layer"
+    columns:
+      - name: student_id
+        tests:
+          - unique
+          - not_null
+      - name: cgpa_band
+        tests:
+          - not_null
+
+  - name: int_colleges_cleaned
+    description: "Cleaned and deduplicated colleges in Silver layer"
+    columns:
+      - name: college_id
+        tests:
+          - unique
+          - not_null
+
+  - name: int_companies_cleaned
+    description: "Cleaned and deduplicated companies in Silver layer"
+    columns:
+      - name: company_id
+        tests:
+          - unique
+          - not_null
+
+  - name: int_offers_cleaned
+    description: "Cleaned, validated and deduplicated offers in Silver layer"
+    columns:
+      - name: offer_id
+        tests:
+          - not_null
+      - name: student_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_students_cleaned')
+              field: student_id
+      - name: college_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_colleges_cleaned')
+              field: college_id
+      - name: company_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_companies_cleaned')
+              field: company_id
+      - name: is_joined
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]

@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: PLACEMENT_DB
+    schema: BRONZE
+    tables:
+      - name: RAW_STUDENTS
+        description: "Raw students ingested from placement_students.csv"
+      - name: RAW_COLLEGES
+        description: "Raw colleges ingested from placement_colleges.csv"
+      - name: RAW_COMPANIES
+        description: "Raw companies ingested from placement_companies.csv"
+      - name: RAW_OFFERS
+        description: "Raw placement offers ingested from placement_offers.csv"
