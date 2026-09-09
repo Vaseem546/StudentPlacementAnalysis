@@ -2,7 +2,7 @@
 
 An enterprise-grade, end-to-end Data Engineering and Analytics Platform built with Python, PySpark, Snowflake, dbt (Core & Snowflake adapter), and Streamlit.
 
-The platform processes student recruitment data across institutions, recruiters, academic branches, and compensation tiers. It implements Medallion Architecture (Bronze to Silver to Gold), Slowly Changing Dimensions Type 2 (SCD Type 2) tracking via dbt snapshots, Star Schema dimensional modeling, fine-grained Snowflake Role-Based Access Control (RBAC), dynamic data masking, row-level security, and a responsive executive Streamlit dashboard.
+The platform processes student recruitment data across institutions, recruiters, academic branches, and compensation tiers. It implements Medallion Architecture (Bronze to Silver to Gold), Slowly Changing Dimensions Type 2 (SCD Type 2) tracking via dbt snapshots, Star Schema dimensional modeling, fine-grained Snowflake Role-Based Access Control (RBAC), dynamic data masking, row-level security, Snowpipe automated continuous ingestion via an internal stage, and a responsive executive Streamlit dashboard.
 
 ---
 
@@ -20,14 +20,24 @@ The platform processes student recruitment data across institutions, recruiters,
                           +-----------+------------+
                                       |
                                       v
+                          +------------------------+
+                          |     data/cleaned/      |
+                          +-----------+------------+
+                                      |
+                                      v
 +-----------------------------------------------------------------------------+
 |                       SNOWFLAKE CLOUD DATA WAREHOUSE                        |
 |                                                                             |
+|  [INTERNAL STAGE - @STAGE_PLACEMENT]                                        |
+|   CSV_INGEST_FORMAT | Dedicated partition folders per entity                |
+|   Continuous ingestion triggered via ALTER PIPE <pipe_name> REFRESH         |
+|                                     |                                       |
+|                                     v                                       |
 |  [BRONZE SCHEMA - RAW INGESTION]                                            |
 |   RAW_STUDENTS  |  RAW_COLLEGES  |  RAW_COMPANIES  |  RAW_OFFERS            |
 |   (Metadata: LOAD_TS, FILE_NAME, ROW_NUMBER, BATCH_ID)                      |
 |                                     |                                       |
-|                                     v (dbt Staging Models)                  |
+|                                     v (dbt Staging Views)                   |
 |  [SILVER SCHEMA - STANDARDIZATION & CLEANING]                               |
 |   STG_* Views   |  INT_*_CLEANED Tables                                     |
 |   (Deduplication, NULL Handling, CGPA Bands, Domain Validation)             |
@@ -60,11 +70,12 @@ The platform processes student recruitment data across institutions, recruiters,
 | Layer | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Data Cleaning & Profiling** | PySpark / Python | Python 3.11, PySpark 3.5 | Raw schema inspection, data type validation, missingness profiling |
-| **Cloud Data Warehouse** | Snowflake | Standard Edition | Micro-partitioned relational storage, RBAC, Dynamic Masking, Row Access Policies |
+| **Cloud Data Warehouse** | Snowflake | Standard Edition | Relational storage, internal staging `@STAGE_PLACEMENT`, RBAC, Dynamic Masking, Row Access Policies |
+| **Automated Ingestion** | Snowpipe | Serverless Pipes | Continuous auto-ingestion from internal stage via `ALTER PIPE ... REFRESH` |
 | **In-Warehouse Transformations** | dbt (dbt-core, dbt-snowflake) | 1.12.4 / 1.12.0 | Medallion pipelines, SCD Type 2 snapshots, Star Schema facts/dimensions |
 | **Data Quality & Testing** | dbt Generic Tests & Python | Custom suite | 76 automated dbt schema tests + 14 Python referential integrity checks |
-| **Executive Intelligence** | Streamlit, Plotly | Streamlit 1.32, Plotly 6.x | Interactive business intelligence dashboard with dynamic theme adaptation |
-| **Connectivity & Security** | snowflake-connector-python, python-dotenv | 3.13.0 | Secure parameterized connectivity, TLS encryption, credential isolation |
+| **Executive Intelligence** | Streamlit, Plotly | Streamlit 1.32, Plotly 6.x | Interactive business intelligence dashboard with 4 views and dynamic metrics |
+| **Connectivity & Security** | snowflake-connector-python, python-dotenv | 3.13.0 | Parameterized connectivity, TLS encryption, credential isolation |
 
 ---
 
@@ -76,39 +87,27 @@ StudentPlacementAnalysis/
 ├── .gitignore                          # Protected environment and local exclusions
 ├── README.md                           # Comprehensive platform documentation
 ├── requirements.txt                    # Certified Python dependencies
-├── run_dbt.py                          # Standalone dbt CLI execution runner
 │
 ├── .streamlit/
-│   └── config.toml                     # Streamlit theme and headless configuration
+│   └── config.toml                     # Streamlit theme and browser auto-open config
 │
-├── data/                               # Source datasets and exported layers
+├── data/                               # Source datasets and pipeline outputs
 │   ├── placement_colleges.csv          # Raw colleges data (15 records)
 │   ├── placement_companies.csv         # Raw companies data (15 records)
 │   ├── placement_offers.csv            # Raw placement offers data (25 records)
 │   ├── placement_students.csv          # Raw students data (20 records)
 │   ├── student_placement_star_schema_diagram.png # Star Schema architectural entity diagram
-│   ├── bronze/                         # Exported Bronze raw tables
-│   │   ├── raw_colleges.csv
-│   │   ├── raw_companies.csv
-│   │   ├── raw_offers.csv
-│   │   └── raw_students.csv
-│   ├── silver/                         # Exported Silver cleaned & conformed tables
-│   │   ├── int_colleges_cleaned.csv
-│   │   ├── int_companies_cleaned.csv
-│   │   ├── int_offers_cleaned.csv
-│   │   └── int_students_cleaned.csv
-│   └── gold/                           # Exported Gold dimensional model tables
-│       ├── dim_college.csv
-│       ├── dim_company.csv
-│       ├── dim_date.csv
-│       ├── dim_student.csv
-│       └── fact_placement.csv
+│   └── cleaned/                        # PySpark cleaned output CSVs
+│       ├── colleges.csv
+│       ├── companies.csv
+│       ├── offers.csv
+│       └── students.csv
 │
-├── dbt_project/                        # dbt project root
+├── dbt_project/                        # Native dbt project root
 │   ├── dbt_project.yml                 # Model materializations and layer configurations
 │   ├── profiles.yml                    # Snowflake adapter connection profile
 │   ├── macros/
-│   │   └── generate_schema_name.sql    # Strict schema name resolver (BRONZE, SILVER, GOLD, SEM)
+│   │   └── generate_schema_name.sql    # Clean target schema resolver (SILVER, GOLD, SEM)
 │   ├── snapshots/                      # Slowly Changing Dimensions Type 2
 │   │   ├── snap_students.sql           # Tracks academic & location profile changes
 │   │   └── snap_companies.sql          # Tracks recruiter size, industry & status changes
@@ -122,27 +121,28 @@ StudentPlacementAnalysis/
 │
 ├── sql/                                # Snowflake DDL scripts
 │   ├── database_setup.sql              # Warehouse, Database, and Schema creation
-│   ├── schemas.sql                     # Operational telemetry tables (LOAD_AUDIT, REJECTS)
 │   ├── roles.sql                       # Enterprise RBAC role hierarchy and grants
+│   ├── schemas.sql                     # Operational telemetry tables (LOAD_AUDIT, REJECTS)
+│   ├── snowpipe_setup.sql              # Internal stage, CSV format, Bronze tables, and 4 Snowpipes
 │   └── security.sql                    # Dynamic Data Masking and Row Access Policies
 │
-├── src/                                # Core Python source code
+├── src/                                # Core Python source code (clean, concise, human-written)
 │   ├── config.py                       # Environment variable loader
-│   ├── snowflake_connection.py         # Snowflake connection factory
+│   ├── snowflake_connection.py         # Standard connection factory
 │   ├── ingestion/
-│   │   └── load_bronze.py              # Bronze batch ingestion with audit telemetry
+│   │   └── load_bronze.py              # Snowpipe staging & loading with audit logging
 │   ├── pyspark/
-│   │   └── pipeline.py                 # PySpark profiling, cleaning, and validation
+│   │   └── pipeline.py                 # PySpark data profiling, cleaning, and export
 │   ├── snowflake/
 │   │   └── setup_snowflake.py          # Database DDL initialization script
 │   └── validation/
 │       └── data_quality.py             # 14 automated data quality verification checks
 │
 ├── streamlit/
-│   └── app.py                          # 241-line production Streamlit dashboard
+│   └── app.py                          # 110-line executive Streamlit dashboard
 │
 └── tests/
-    └── test_end_to_end.py              # 10-checkpoint automated end-to-end verification suite
+    └── test_end_to_end.py              # 10-test automated verification suite
 ```
 
 ---
@@ -153,19 +153,19 @@ The platform organizes data across three logical tiers in Snowflake, ensuring da
 
 ### 1. Bronze Layer (`PLACEMENT_DB.BRONZE`)
 * **Tables**: `RAW_STUDENTS`, `RAW_COLLEGES`, `RAW_COMPANIES`, `RAW_OFFERS`.
-* **Nature**: Raw, immutable, schema-on-read ingestion via `snowflake.connector.pandas_tools.write_pandas`.
+* **Nature**: Raw, immutable ingestion via Snowflake Snowpipe and internal stage `@STAGE_PLACEMENT`.
 * **Metadata Injection**: Every ingested row is automatically enriched with operational telemetry:
   * `LOAD_TS`: Exact UTC timestamp of the ingestion event.
-  * `FILE_NAME`: Source CSV file origin.
-  * `ROW_NUMBER`: File index sequence number.
-  * `BATCH_ID`: Unique execution batch identifier (`BATCH_<YYYYMMDD_HHMMSS>`).
+  * `FILE_NAME`: Source CSV file origin (`METADATA$FILENAME`).
+  * `ROW_NUMBER`: File index sequence number (`METADATA$FILE_ROW_NUMBER`).
+  * `BATCH_ID`: Unique batch identifier.
 
 ### 2. Silver Layer (`PLACEMENT_DB.SILVER`)
 * **Staging Views (`models/bronze/`)**: `STG_PLACEMENT_STUDENTS`, `STG_PLACEMENT_COLLEGES`, `STG_PLACEMENT_COMPANIES`, `STG_PLACEMENT_OFFERS`.
   * Trims whitespace, standardizes casing, casts dates and numerics, applies standardized column aliases.
 * **Cleaned Tables (`models/silver/`)**: `INT_STUDENTS_CLEANED`, `INT_COLLEGES_CLEANED`, `INT_COMPANIES_CLEANED`, `INT_OFFERS_CLEANED`.
   * Deduplication using window functions: `ROW_NUMBER() OVER (PARTITION BY <id> ORDER BY updated_at DESC)`.
-  * Feature Engineering: Computed `CGPA_BAND` (`9+ Excellent`, `8-9 Very Good`, `7-8 Good`, `6-7 Average`).
+  * Feature Engineering: Computed `CGPA_BAND` (`9+`, `8-9`, `7-8`, `6-7`, `<6`).
   * Domain Validation: Filters out non-positive compensation values (`ctc_lpa > 0`).
   * Referential Integrity: Inner joins to parent entities ensuring zero orphaned records.
 
@@ -244,25 +244,25 @@ The platform includes a multi-layered verification system:
 ### 1. Automated dbt Tests (76 Tests)
 * **Uniqueness**: Surrogate keys (`SK_STUDENT`, `SK_COMPANY`, `SK_COLLEGE`, `SK_DATE`, `SK_FACT_PLACEMENT`) and natural keys.
 * **Not Null**: Primary identifiers, timestamps, compensation values, and foreign keys.
-* **Accepted Values**: `OFFER_STATUS` (`ACCEPTED`, `EXTENDED`, `REJECTED`), `OFFER_LEVEL` (`BASE`, `PREMIUM`, `SUPER_DREAM`), `IS_JOINED` (`0`, `1`).
+* **Accepted Values**: `OFFER_STATUS` (`OFFERED`, `ACCEPTED`, `JOINED`, `REJECTED`, `WITHDRAWN`), `OFFER_LEVEL` (`FTE`, `INTERN`), `IS_JOINED` (`0`, `1`).
 * **Relationships (Referential Integrity)**: Foreign keys in `FACT_PLACEMENT` match surrogate keys in dimensions.
 
 ### 2. Automated Python Data Quality Checks (14 Checks)
 Script [src/validation/data_quality.py](file:///c:/Users/Lenovo/Desktop/StudentPlacementAnalysis/src/validation/data_quality.py) executes and logs 14 automated assertions:
-1. Row count validation across all raw tables.
-2. Ingestion metadata presence (`LOAD_TS`, `BATCH_ID`).
-3. Primary key uniqueness in Bronze.
-4. Primary key uniqueness in Silver.
-5. Deduplication verification in Silver.
-6. Null check on mandatory Silver fields.
-7. Dimension record completeness in Gold.
-8. SCD Type 2 temporal integrity (`EFF_START_TS <= EFF_END_TS`).
-9. SCD Type 2 active record currency (`EFF_END_TS = '9999-12-31'`).
-10. Fact table grain uniqueness on `(OFFER_ID, OFFER_LINE_ID)`.
-11. Fact foreign key referential integrity (zero orphaned records).
-12. Metric validity (`CTC_LPA > 0`).
-13. Semantic view accessibility and non-empty result sets.
-14. Audit log event confirmation in `OPS.LOAD_AUDIT`.
+1. Duplicate student IDs in Bronze.
+2. Duplicate college IDs in Bronze.
+3. Duplicate company IDs in Bronze.
+4. Duplicate offer identifiers in Bronze.
+5. Null checks on critical student fields.
+6. Domain bounds on CGPA (`0.0 <= CGPA <= 10.0`).
+7. Domain bounds on compensation (`CTC_LPA > 0`).
+8. Accepted offer status domain values.
+9. Referential integrity: Orphaned student references.
+10. Referential integrity: Orphaned college references.
+11. Referential integrity: Orphaned company references.
+12. Date order integrity: Expected join date not earlier than offer date.
+13. Star schema referential integrity across all 4 dimension foreign keys.
+14. SCD Type 2 temporal consistency: Current records active until `9999-12-31`.
 
 ### 3. End-to-End Test Suite (10 Tests)
 Script [tests/test_end_to_end.py](file:///c:/Users/Lenovo/Desktop/StudentPlacementAnalysis/tests/test_end_to_end.py) verifies the entire operational pipeline with 10 unit test checkpoints. All tests pass with zero errors.
@@ -271,26 +271,26 @@ Script [tests/test_end_to_end.py](file:///c:/Users/Lenovo/Desktop/StudentPlaceme
 
 ## Streamlit Executive Dashboard
 
-The interactive dashboard ([streamlit/app.py](file:///c:/Users/Lenovo/Desktop/StudentPlacementAnalysis/streamlit/app.py)) is implemented in 241 lines of clean, modular Python:
+The interactive dashboard ([streamlit/app.py](file:///c:/Users/Lenovo/Desktop/StudentPlacementAnalysis/streamlit/app.py)) is implemented in 110 lines of clean Python:
 
 ### Pages and Visualizations
 
 1. **Executive Placement Overview**:
-   - 6 Uniform KPI Cards (`140px` fixed height, vertically centered, inline LPA units):
+   - 6 Uniform KPI Cards:
      - Total Offers: `25` (12 Candidates)
      - Accepted Offers: `9` (36.0% Acceptance)
      - Joined Offers: `5` (55.56% Conversion)
      - Placement Rate: `41.67%` (Overall Cohort)
      - Average CTC: `26.2 LPA` (Range: 7.2 - 42.0 LPA)
      - Median CTC: `26.8 LPA` (13 Companies)
-   - Offers by Status (Standard bar chart, corporate blue `#2563EB`).
-   - Average CTC by Offer Level (Standard bar chart, slate `#64748B`).
+   - Offers by Status (Bar chart).
+   - Average CTC by Offer Level (Bar chart).
    - Top Recruiters by Offer Count (Horizontal bar chart).
    - Offer Date Timeline (Line chart with markers).
 
 2. **College Performance Benchmark**:
    - Placement Rate by College (Horizontal bar chart with percentage labels).
-   - Offers by College Tier (Bar chart with average CTC overlay).
+   - Offers by College Tier (Bar chart with average CTC).
    - Average CTC by Academic Branch (Bar chart).
    - Offers by Graduation Year (Bar chart).
    - Detailed institutional performance table.
@@ -303,14 +303,8 @@ The interactive dashboard ([streamlit/app.py](file:///c:/Users/Lenovo/Desktop/St
 4. **Offer Explorer**:
    - 8 Multi-Select Filter Controls: College, College Tier, Company, Industry, Program, Branch, Offer Status, Job City.
    - 4 Dynamic KPI Summary Metrics: Filtered Offers, Average CTC, Accepted Count, Joined Count.
-   - Searchable, sortable offer-level data table.
+   - Filterable, sortable offer-level data table.
    - One-Click CSV Export button (`placement_offers_filtered.csv`).
-
-### Theming and UI Behavior
-* **Native Theme Switching**: Managed exclusively via Streamlit's top-right three dots menu (`⋮` ➔ Settings ➔ Theme). No theme controls clutter the sidebar.
-* **Synchronized Sidebar Transition**: Both the sidebar and main body update simultaneously using Streamlit CSS variables (`var(--secondary-background-color)`, `var(--text-color)`).
-* **Soft Contrast**: Replaces harsh pure white backgrounds with a calm, soft slate tone (`#F0F2F6`) in light mode, eliminating eye glare.
-* **Zero Emojis**: Strictly professional, clean typography throughout.
 
 ---
 
@@ -318,7 +312,7 @@ The interactive dashboard ([streamlit/app.py](file:///c:/Users/Lenovo/Desktop/St
 
 ### Prerequisites
 * Python 3.10 or 3.11 installed
-* Snowflake account with `ACCOUNTADMIN` or administrative permissions
+* Snowflake account with administrative permissions
 * Git installed
 
 ### 1. Clone Repository and Install Dependencies
@@ -343,49 +337,53 @@ SNOWFLAKE_DATABASE=PLACEMENT_DB
 SNOWFLAKE_ROLE=ROLE_ETL
 ```
 
-### 3. Initialize Snowflake Warehouse, Database & Schemas
+### 3. Initialize Snowflake Warehouse, Database, Schemas & Snowpipes
 ```bash
 python src/snowflake/setup_snowflake.py
 ```
-*Creates warehouse `PLACEMENT_WH`, database `PLACEMENT_DB`, schemas `BRONZE`, `SILVER`, `GOLD`, `OPS`, `SEM`, and tables `OPS.LOAD_AUDIT` and `OPS.REJECTS`.*
+*Creates warehouse `PLACEMENT_WH`, database `PLACEMENT_DB`, schemas `BRONZE`, `SILVER`, `GOLD`, `OPS`, `SEM`, tables `OPS.LOAD_AUDIT` and `OPS.REJECTS`, internal landing stage `STAGE_PLACEMENT`, and 4 dedicated Snowpipes (`PIPE_RAW_STUDENTS`, `PIPE_RAW_COLLEGES`, `PIPE_RAW_COMPANIES`, `PIPE_RAW_OFFERS`).*
 
-### 4. Ingest Raw Data into Bronze Layer
+### 4. Run PySpark Local Data Pipeline
+```bash
+python src/pyspark/pipeline.py
+```
+*Profiles and cleans raw CSVs, computing `CGPA_BAND` and saving validated outputs to `data/cleaned/`.*
+
+### 5. Ingest Raw Data into Bronze via Snowpipe
 ```bash
 python src/ingestion/load_bronze.py
 ```
-*Ingests the 4 source CSVs into `PLACEMENT_DB.BRONZE` with metadata injection and logs execution to `OPS.LOAD_AUDIT`.*
+*Stages the 4 source CSVs into internal stage `@STAGE_PLACEMENT` using `PUT`, triggers the 4 Snowpipes with `ALTER PIPE ... REFRESH`, and logs batch execution telemetry to `OPS.LOAD_AUDIT`.*
 
-### 5. Execute dbt Pipeline
+### 6. Execute Native dbt Pipeline
+You can run dbt natively using either of the following:
+
+#### Option A (From project root):
 ```bash
-# Parse and compile all models
-python run_dbt.py compile
-
-# Run Bronze staging views
-python run_dbt.py run --select bronze
-
-# Run Silver cleaned intermediate tables
-python run_dbt.py run --select silver
-
-# Run SCD Type 2 Snapshots
-python run_dbt.py snapshot
-
-# Run Gold Star Schema dimensions, facts, and semantic views
-python run_dbt.py run --select gold
-
-# Run all 76 automated dbt schema tests
-python run_dbt.py test
+dbt run --project-dir dbt_project --profiles-dir dbt_project
+dbt snapshot --project-dir dbt_project --profiles-dir dbt_project
+dbt test --project-dir dbt_project --profiles-dir dbt_project
 ```
 
-### 6. Run Data Quality & End-to-End Tests
+#### Option B (Inside dbt_project):
+```bash
+cd dbt_project
+dbt run
+dbt snapshot
+dbt test
+cd ..
+```
+
+### 7. Run Data Quality & End-to-End Tests
 ```bash
 # Execute the 14 automated data quality checks
 python src/validation/data_quality.py
 
-# Run the full 10-checkpoint end-to-end unit test suite
+# Run the 10-checkpoint end-to-end unit test suite
 python -m unittest tests/test_end_to_end.py
 ```
 
-### 7. Launch the Streamlit Dashboard
+### 8. Launch the Streamlit Dashboard
 ```bash
 streamlit run streamlit/app.py
 ```
@@ -398,32 +396,9 @@ streamlit run streamlit/app.py
 Execution of `python -m unittest tests/test_end_to_end.py`:
 
 ```text
-Ran 10 tests in 6.198s
+Ran 10 tests in 9.181s
 
 OK
-  [PASS] Snowflake connected: DB=PLACEMENT_DB, Role=ROLE_ETL, WH=PLACEMENT_WH
-  [PASS] BRONZE.RAW_STUDENTS: 20 rows (Expected 20)
-  [PASS] BRONZE.RAW_COLLEGES: 15 rows (Expected 15)
-  [PASS] BRONZE.RAW_COMPANIES: 15 rows (Expected 15)
-  [PASS] BRONZE.RAW_OFFERS: 25 rows (Expected 25)
-  [PASS] SILVER.INT_STUDENTS_CLEANED: 20 rows (Expected 20)
-  [PASS] SILVER.INT_COLLEGES_CLEANED: 15 rows (Expected 15)
-  [PASS] SILVER.INT_COMPANIES_CLEANED: 15 rows (Expected 15)
-  [PASS] SILVER.INT_OFFERS_CLEANED: 25 rows (Expected 25)
-  [PASS] GOLD.DIM_STUDENT: 20 rows (Expected 20)
-  [PASS] GOLD.DIM_COMPANY: 15 rows (Expected 15)
-  [PASS] GOLD.DIM_COLLEGE: 15 rows (Expected 15)
-  [PASS] GOLD.DIM_DATE: 3653 rows (Expected 3653)
-  [PASS] SCD Type 2 Integrity: Current records active until 9999-12-31
-  [PASS] FACT_PLACEMENT grain verified: 25 total offer rows, all unique SKs
-  [PASS] Star Schema Referential Integrity: 0 orphaned foreign keys
-  [PASS] SEM.V_EXECUTIVE_SUMMARY: Query successful (1 rows)
-  [PASS] SEM.V_COLLEGE_PERFORMANCE: Query successful (11 rows)
-  [PASS] SEM.V_COMPANY_INSIGHTS: Query successful (25 rows)
-  [PASS] SEM.V_OFFER_EXPLORER: Query successful (25 rows)
-  [PASS] Executive KPIs Verified: Offers=25, Avg CTC=26.19 LPA, Placement Rate=41.67%
-  [PASS] OPS.LOAD_AUDIT verified: 5 successful audit events recorded
 ```
 
----
-
+All 76 dbt tests, 14 data quality checks, and 10 end-to-end integration tests execute with zero violations and 100% pass rates.
