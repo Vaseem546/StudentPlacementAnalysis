@@ -1,24 +1,14 @@
--- ============================================================
--- PHASE 4: DATABASE, WAREHOUSE, SCHEMAS
--- Run this in Snowflake as ACCOUNTADMIN or SYSADMIN
--- ============================================================
+create warehouse if not exists PLACEMENT_WH
+    warehouse_size = 'X-SMALL'
+    auto_suspend = 60
+    auto_resume = true;
 
--- Warehouse
-CREATE WAREHOUSE IF NOT EXISTS PLACEMENT_WH
-    WAREHOUSE_SIZE = 'X-SMALL'
-    AUTO_SUSPEND   = 60
-    AUTO_RESUME    = TRUE
-    COMMENT        = 'Placement Analytics Warehouse';
+create database if not exists PLACEMENT_DB;
 
--- Database
-CREATE DATABASE IF NOT EXISTS PLACEMENT_DB
-    COMMENT = 'Student Placement Analytics Platform';
+use database PLACEMENT_DB;
 
-USE DATABASE PLACEMENT_DB;
-
--- Schemas
-CREATE SCHEMA IF NOT EXISTS BRONZE  COMMENT = 'Raw ingested data';
-CREATE SCHEMA IF NOT EXISTS SILVER  COMMENT = 'Cleaned and validated data';
-CREATE SCHEMA IF NOT EXISTS GOLD    COMMENT = 'Star schema - dimensions and facts';
-CREATE SCHEMA IF NOT EXISTS OPS     COMMENT = 'Audit, rejects and monitoring';
-CREATE SCHEMA IF NOT EXISTS SEM     COMMENT = 'Semantic views for Streamlit';
+create schema if not exists BRONZE;
+create schema if not exists SILVER;
+create schema if not exists GOLD;
+create schema if not exists OPS;
+create schema if not exists SEM;

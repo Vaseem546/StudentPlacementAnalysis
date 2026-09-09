@@ -1,27 +1,22 @@
--- ============================================================
--- PHASE 4: OPS SCHEMA - AUDIT AND REJECTS TABLES
--- Run this in Snowflake as SYSADMIN or ROLE_ETL
--- ============================================================
+use database PLACEMENT_DB;
+use schema OPS;
 
-USE DATABASE PLACEMENT_DB;
-USE SCHEMA OPS;
-
-CREATE TABLE IF NOT EXISTS OPS.LOAD_AUDIT (
-    AUDIT_ID        NUMBER AUTOINCREMENT PRIMARY KEY,
-    BATCH_ID        VARCHAR(50),
-    FILE_NAME       VARCHAR(200),
-    ENTITY          VARCHAR(50),
-    LOAD_TS         TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-    ROW_COUNT       NUMBER,
-    STATUS          VARCHAR(20),   -- SUCCESS / FAILURE
-    ERROR_MSG       VARCHAR(2000)
+create table if not exists OPS.LOAD_AUDIT (
+    audit_id number autoincrement primary key,
+    batch_id varchar(50),
+    file_name varchar(200),
+    entity varchar(50),
+    load_ts timestamp_ntz default current_timestamp(),
+    row_count number,
+    status varchar(20),
+    error_msg varchar(2000)
 );
 
-CREATE TABLE IF NOT EXISTS OPS.REJECTS (
-    REJECT_ID       NUMBER AUTOINCREMENT PRIMARY KEY,
-    BATCH_ID        VARCHAR(50),
-    ENTITY          VARCHAR(50),
-    SOURCE_ROW      VARIANT,
-    REJECT_REASON   VARCHAR(500),
-    REJECTED_AT     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+create table if not exists OPS.REJECTS (
+    reject_id number autoincrement primary key,
+    batch_id varchar(50),
+    entity varchar(50),
+    source_row variant,
+    reject_reason varchar(500),
+    rejected_at timestamp_ntz default current_timestamp()
 );

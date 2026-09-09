@@ -1,50 +1,39 @@
--- ============================================================
--- PHASE 4: SECURITY - MASKING AND ROW-LEVEL SECURITY
--- Run this in Snowflake as ACCOUNTADMIN or SYSADMIN
--- ============================================================
+use database PLACEMENT_DB;
+use schema BRONZE;
 
-USE DATABASE PLACEMENT_DB;
-USE SCHEMA BRONZE;
+create or replace masking policy BRONZE.MASK_NAME as (val string)
+returns string ->
+    case
+        when current_role() in ('ROLE_ETL', 'ROLE_ADMIN', 'SYSADMIN') then val
+        else '***MASKED***'
+    end;
 
--- ── Column-level masking: hide student names from non-ETL roles ──────────────
+create or replace masking policy BRONZE.MASK_DOB as (val string)
+returns string ->
+    case
+        when current_role() in ('ROLE_ETL', 'ROLE_ADMIN', 'SYSADMIN') then val
+        else '****-**-**'
+    end;
 
-CREATE OR REPLACE MASKING POLICY BRONZE.MASK_NAME AS (val STRING)
-RETURNS STRING ->
-    CASE
-        WHEN CURRENT_ROLE() IN ('ROLE_ETL', 'ROLE_ADMIN', 'SYSADMIN') THEN val
-        ELSE '***MASKED***'
-    END;
+use schema GOLD;
 
-CREATE OR REPLACE MASKING POLICY BRONZE.MASK_DOB AS (val STRING)
-RETURNS STRING ->
-    CASE
-        WHEN CURRENT_ROLE() IN ('ROLE_ETL', 'ROLE_ADMIN', 'SYSADMIN') THEN val
-        ELSE '****-**-**'
-    END;
+create or replace row access policy GOLD.RAP_ACTIVE_COLLEGES
+as (status string) returns boolean ->
+    case
+        when current_role() in ('ROLE_ADMIN', 'ROLE_ETL', 'SYSADMIN') then true
+        else status = 'ACTIVE'
+    end;
 
--- ── Row-level security: analysts only see ACTIVE college/company records ─────
+create or replace row access policy GOLD.RAP_ACTIVE_COMPANIES
+as (status string) returns boolean ->
+    case
+        when current_role() in ('ROLE_ADMIN', 'ROLE_ETL', 'SYSADMIN', 'ACCOUNTADMIN') then true
+        else status = 'ACTIVE'
+    end;
 
-USE SCHEMA GOLD;
+alter table BRONZE.RAW_STUDENTS modify column FIRST_NAME set masking policy BRONZE.MASK_NAME;
+alter table BRONZE.RAW_STUDENTS modify column LAST_NAME set masking policy BRONZE.MASK_NAME;
+alter table BRONZE.RAW_STUDENTS modify column DOB set masking policy BRONZE.MASK_DOB;
 
-CREATE OR REPLACE ROW ACCESS POLICY GOLD.RAP_ACTIVE_COLLEGES
-AS (status STRING) RETURNS BOOLEAN ->
-    CASE
-        WHEN CURRENT_ROLE() IN ('ROLE_ADMIN', 'ROLE_ETL', 'SYSADMIN') THEN TRUE
-        ELSE status = 'ACTIVE'
-    END;
-
-CREATE OR REPLACE ROW ACCESS POLICY GOLD.RAP_ACTIVE_COMPANIES
-AS (status STRING) RETURNS BOOLEAN ->
-    CASE
-        WHEN CURRENT_ROLE() IN ('ROLE_ADMIN', 'ROLE_ETL', 'SYSADMIN', 'ACCOUNTADMIN') THEN TRUE
-        ELSE status = 'ACTIVE'
-    END;
-
--- ── Apply Policies ───────────────────────────────────────────────────────────
-ALTER TABLE BRONZE.RAW_STUDENTS MODIFY COLUMN FIRST_NAME SET MASKING POLICY BRONZE.MASK_NAME;
-ALTER TABLE BRONZE.RAW_STUDENTS MODIFY COLUMN LAST_NAME SET MASKING POLICY BRONZE.MASK_NAME;
-ALTER TABLE BRONZE.RAW_STUDENTS MODIFY COLUMN DOB SET MASKING POLICY BRONZE.MASK_DOB;
-
-ALTER TABLE GOLD.DIM_COLLEGE ADD ROW ACCESS POLICY GOLD.RAP_ACTIVE_COLLEGES ON (status);
-ALTER TABLE GOLD.DIM_COMPANY ADD ROW ACCESS POLICY GOLD.RAP_ACTIVE_COMPANIES ON (status);
-
+alter table GOLD.DIM_COLLEGE add row access policy GOLD.RAP_ACTIVE_COLLEGES on (status);
+alter table GOLD.DIM_COMPANY add row access policy GOLD.RAP_ACTIVE_COMPANIES on (status);
