@@ -1,35 +1,25 @@
+import os
 import snowflake.connector
 from src.config import SNOWFLAKE_CONFIG
 
-
 def get_connection():
+    kwargs = {k: v for k, v in SNOWFLAKE_CONFIG.items() if v}
     try:
-        kwargs = {
-            "account": SNOWFLAKE_CONFIG["account"],
-            "user": SNOWFLAKE_CONFIG["user"],
-            "password": SNOWFLAKE_CONFIG["password"],
-            "warehouse": SNOWFLAKE_CONFIG["warehouse"],
-            "database": SNOWFLAKE_CONFIG["database"],
-            "schema": SNOWFLAKE_CONFIG["schema"],
-        }
-        if SNOWFLAKE_CONFIG.get("role"):
-            kwargs["role"] = SNOWFLAKE_CONFIG["role"]
         return snowflake.connector.connect(**kwargs)
-    except Exception as e:
-        if "Role" in str(e) or "role" in str(e):
-            kwargs.pop("role", None)
-            return snowflake.connector.connect(**kwargs)
-        raise e
+    except Exception:
+        kwargs.pop("role", None)
+        return snowflake.connector.connect(**kwargs)
 
-
-def run_query(sql: str, conn=None):
-    close_after = conn is None
-    if conn is None:
+def run_query(sql, conn=None):
+    close = False
+    if not conn:
         conn = get_connection()
+        close = True
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
         cur.execute(sql)
         return cur.fetchall()
     finally:
-        if close_after:
+        cur.close()
+        if close:
             conn.close()
