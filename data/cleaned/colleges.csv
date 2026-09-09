@@ -1,0 +1,16 @@
+COLLEGE_ID,COLLEGE_NAME,CITY,STATE,COUNTRY,OWNERSHIP,TIER,CATEGORY,ESTABLISHED_DATE,STATUS
+CL001,Anna University - CEG,Chennai,TN,India,Public,Tier-1,Engineering,1978-01-01,ACTIVE
+CL002,IIT Madras,Chennai,TN,India,Public,Tier-1,Engineering,1959-01-01,ACTIVE
+CL003,NIT Trichy,Tiruchirappalli,TN,India,Public,Tier-1,Engineering,1964-01-01,ACTIVE
+CL004,SRM Institute of Science and Technology,Kattankulathur,TN,India,Private,Tier-1,Engineering,1985-01-01,ACTIVE
+CL005,VIT Vellore,Vellore,TN,India,Private,Tier-1,Engineering,1984-01-01,ACTIVE
+CL006,BITS Pilani,Pilani,RJ,India,Private,Tier-1,Engineering,1964-01-01,ACTIVE
+CL007,Delhi University,Delhi,DL,India,Public,Tier-1,University,1922-01-01,ACTIVE
+CL008,Jadavpur University,Kolkata,WB,India,Public,Tier-1,Engineering,1955-01-01,ACTIVE
+CL009,IIT Bombay,Mumbai,MH,India,Public,Tier-1,Engineering,1958-01-01,ACTIVE
+CL010,IIT Delhi,Delhi,DL,India,Public,Tier-1,Engineering,1961-01-01,ACTIVE
+CL011,PSG College of Technology,Coimbatore,TN,India,Private,Tier-2,Engineering,1951-01-01,ACTIVE
+CL012,Manipal Institute of Technology,Manipal,KA,India,Private,Tier-2,Engineering,1957-01-01,ACTIVE
+CL013,College of Engineering Pune (COEP),Pune,MH,India,Public,Tier-1,Engineering,1854-01-01,ACTIVE
+CL014,JNTU Hyderabad,Hyderabad,TS,India,Public,Tier-2,Engineering,1972-01-01,ACTIVE
+CL015,Amity University,Noida,UP,India,Private,Tier-2,University,2005-01-01,ACTIVE
