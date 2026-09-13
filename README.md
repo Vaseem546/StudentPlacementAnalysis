@@ -152,6 +152,108 @@ The platform organizes data across three logical tiers in Snowflake, ensuring da
   * Referential Integrity: Inner joins to parent entities ensuring zero orphaned records.
 
 ### 3. Gold Layer (`PLACEMENT_DB.GOLD`) - Star Schema
+
+The Gold analytical layer implements an enterprise dimensional **Star Schema** centered around the `FACT_PLACEMENT` fact table with four conformed dimensions (including Slowly Changing Dimensions Type 2):
+
+```mermaid
+erDiagram
+    DIM_STUDENT ||--o{ FACT_PLACEMENT : "receives (1:N)"
+    DIM_COMPANY ||--o{ FACT_PLACEMENT : "offers (1:N)"
+    DIM_COLLEGE ||--o{ FACT_PLACEMENT : "originates (1:N)"
+    DIM_DATE ||--o{ FACT_PLACEMENT : "offered on (1:N)"
+    DIM_DATE ||--o{ FACT_PLACEMENT : "joined on (1:N)"
+
+    DIM_STUDENT {
+        varchar sk_student PK "MD5 Surrogate Key"
+        varchar student_id "Natural Identifier"
+        varchar first_name "Student First Name"
+        varchar last_name "Student Last Name"
+        varchar gender "Gender (M / F)"
+        varchar program "B.Tech | M.Tech | MBA"
+        varchar branch "CSE | IT | ECE | MECH | CIVIL"
+        integer grad_year "Graduation Year"
+        number cgpa "Scale 0.00 - 10.00"
+        varchar cgpa_band "9+ | 8-9 | 7-8 | 6-7"
+        varchar segment "REGULAR | PREMIUM | VIP"
+        varchar city "Student Hometown City"
+        varchar state "Student Hometown State"
+        varchar country "Country"
+        varchar hash_diff "SCD2 Change Detection Hash"
+        timestamp eff_start_ts "Effective Start Timestamp"
+        timestamp eff_end_ts "Effective End Timestamp (9999-12-31)"
+        boolean is_current "Active Dimension Version Flag"
+    }
+
+    DIM_COMPANY {
+        varchar sk_company PK "MD5 Surrogate Key"
+        varchar company_id "Natural Identifier"
+        varchar company_name "Corporate Name"
+        varchar industry "Technology | Finance | Healthcare | Consulting"
+        varchar hq_country "Headquarters Country"
+        varchar size_band "Enterprise | Mid-Market | Startup"
+        varchar hiring_city "Primary Work Location"
+        varchar hiring_state "Hiring State"
+        varchar status "ACTIVE | INACTIVE"
+        varchar partner_since "Partnership Inception Date"
+        varchar hash_diff "SCD2 Change Detection Hash"
+        timestamp eff_start_ts "Effective Start Timestamp"
+        timestamp eff_end_ts "Effective End Timestamp (9999-12-31)"
+        boolean is_current "Active Dimension Version Flag"
+    }
+
+    DIM_COLLEGE {
+        varchar sk_college PK "MD5 Surrogate Key"
+        varchar college_id "Natural Identifier"
+        varchar college_name "Institutional Name"
+        varchar city "Campus City"
+        varchar state "Campus State"
+        varchar country "Country"
+        varchar ownership "Public | Private"
+        varchar tier "Tier-1 | Tier-2 | Tier-3"
+        varchar category "Engineering | Management"
+        varchar established_date "Foundation Year"
+        varchar status "ACTIVE"
+    }
+
+    DIM_DATE {
+        integer sk_date PK "YYYYMMDD Integer Key"
+        date date_value "Calendar Date (2020-2029 Spine)"
+        integer year "Calendar Year"
+        integer quarter "Quarter (1 - 4)"
+        integer month "Month Number (1 - 12)"
+        varchar month_name "Full Month Name"
+        integer week_of_year "ISO Week Number (1 - 53)"
+        varchar day_of_week "Day Name (Mon - Sun)"
+        boolean is_weekend "Weekend Indicator (TRUE / FALSE)"
+    }
+
+    FACT_PLACEMENT {
+        varchar sk_fact_placement PK "MD5(offer_id || offer_line_id)"
+        varchar offer_id "Degenerate Dim: Natural Offer ID"
+        integer offer_line_id "Degenerate Dim: Offer Line Item"
+        varchar sk_student FK "Surrogate Key -> DIM_STUDENT"
+        varchar sk_company FK "Surrogate Key -> DIM_COMPANY"
+        varchar sk_college FK "Surrogate Key -> DIM_COLLEGE"
+        integer sk_offer_date FK "Surrogate Key -> DIM_DATE (Offer)"
+        integer sk_join_date FK "Surrogate Key -> DIM_DATE (Join)"
+        varchar role_title "Offered Designation"
+        varchar offer_level "FTE | INTERN"
+        varchar hiring_mode "ON_CAMPUS | OFF_CAMPUS | REFERRAL"
+        varchar offer_status "OFFERED | ACCEPTED | JOINED | REJECTED"
+        integer is_accepted "Binary Flag (0 | 1)"
+        integer is_joined "Binary Flag (0 | 1)"
+        float ctc_lpa "Annual Compensation in Lakhs (INR)"
+        float monthly_stipend "Monthly Internship Stipend (INR)"
+        timestamp updated_at "Source Timestamp"
+        timestamp load_ts "Warehouse Ingestion Timestamp"
+        varchar batch_id "Pipeline Batch Identifier"
+    }
+```
+
+<p align="center">
+  <img src="data/student_placement_star_schema_diagram.png" alt="Star Schema Architectural Entity Diagram" width="900"/>
+</p>
+
 * **Dimension: `DIM_STUDENT` (SCD Type 2)**:
   * Built from dbt snapshot `snap_students`.
   * Tracks historical revisions to student records: program, branch, graduation year, CGPA band, segment, and city.
