@@ -4,15 +4,15 @@ config-version: 2
 
 profile: 'student_placement_analytics'
 
-model-paths: ["models"]
-analysis-paths: ["analyses"]
-test-paths: ["tests"]
-seed-paths: ["seeds"]
-macro-paths: ["macros"]
-snapshot-paths: ["snapshots"]
+model-paths: ["dbt_project/models"]
+analysis-paths: ["dbt_project/analyses"]
+test-paths: ["dbt_project/tests"]
+seed-paths: ["dbt_project/seeds"]
+macro-paths: ["dbt_project/macros"]
+snapshot-paths: ["dbt_project/snapshots"]
 
 clean-targets:
-  - "target"
+  - "dbt_project/target"
   - "dbt_packages"
 
 models:

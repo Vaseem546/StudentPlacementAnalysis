@@ -87,6 +87,8 @@ StudentPlacementAnalysis/
 ├── .gitignore                          # Protected environment and local exclusions
 ├── README.md                           # Comprehensive platform documentation
 ├── requirements.txt                    # Certified Python dependencies
+├── dbt_project.yml                     # Root dbt project configuration
+├── profiles.yml                        # Root Snowflake adapter connection profile
 │
 ├── .streamlit/
 │   └── config.toml                     # Streamlit theme and browser auto-open config
@@ -103,9 +105,7 @@ StudentPlacementAnalysis/
 │       ├── offers.csv
 │       └── students.csv
 │
-├── dbt_project/                        # Native dbt project root
-│   ├── dbt_project.yml                 # Model materializations and layer configurations
-│   ├── profiles.yml                    # Snowflake adapter connection profile
+├── dbt_project/                        # dbt transformation assets
 │   ├── macros/
 │   │   └── generate_schema_name.sql    # Clean target schema resolver (SILVER, GOLD, SEM)
 │   ├── snapshots/                      # Slowly Changing Dimensions Type 2
@@ -356,23 +356,13 @@ python src/ingestion/load_bronze.py
 *Stages the 4 source CSVs into internal stage `@STAGE_PLACEMENT` using `PUT`, triggers the 4 Snowpipes with `ALTER PIPE ... REFRESH`, and logs batch execution telemetry to `OPS.LOAD_AUDIT`.*
 
 ### 6. Execute Native dbt Pipeline
-You can run dbt natively using either of the following:
-
-#### Option A (From project root):
+Run dbt transformations and snapshots directly from the project root:
 ```bash
-dbt run --project-dir dbt_project --profiles-dir dbt_project
-dbt snapshot --project-dir dbt_project --profiles-dir dbt_project
-dbt test --project-dir dbt_project --profiles-dir dbt_project
-```
-
-#### Option B (Inside dbt_project):
-```bash
-cd dbt_project
 dbt run
 dbt snapshot
 dbt test
-cd ..
 ```
+*Executes all staging views, intermediate cleaned tables, Gold Star Schema dimensions (with SCD Type 2 tracking), incremental merge Fact table, and Semantic analytical views directly from root without requiring folder flags.*
 
 ### 7. Run Data Quality & End-to-End Tests
 ```bash
