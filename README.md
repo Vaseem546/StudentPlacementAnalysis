@@ -1,6 +1,6 @@
 # Student Placement Analytics Platform
 
-An enterprise-grade, end-to-end Data Engineering and Analytics Platform built with Python, PySpark, Snowflake, dbt (Core & Snowflake adapter), and Streamlit.
+An enterprise-grade, end-to-end Data Engineering and Analytics Platform built with Python, Snowflake, dbt (Core & Snowflake adapter), and Streamlit.
 
 The platform processes student recruitment data across institutions, recruiters, academic branches, and compensation tiers. It implements Medallion Architecture (Bronze to Silver to Gold), Slowly Changing Dimensions Type 2 (SCD Type 2) tracking via dbt snapshots, Star Schema dimensional modeling, fine-grained Snowflake Role-Based Access Control (RBAC), dynamic data masking, row-level security, Snowpipe automated continuous ingestion via an internal stage, and a responsive executive Streamlit dashboard.
 
@@ -11,20 +11,10 @@ The platform processes student recruitment data across institutions, recruiters,
 ```
                           +------------------------+
                           |   4 Source CSV Files   |
+                          | (data/placement_*.csv) |
                           +-----------+------------+
                                       |
-                                      v
-                          +------------------------+
-                          |    PySpark Pipeline    |
-                          | (Clean & Profile Data) |
-                          +-----------+------------+
-                                      |
-                                      v
-                          +------------------------+
-                          |     data/cleaned/      |
-                          +-----------+------------+
-                                      |
-                                      v
+                                      v (PUT Staging)
 +-----------------------------------------------------------------------------+
 |                       SNOWFLAKE CLOUD DATA WAREHOUSE                        |
 |                                                                             |
@@ -69,7 +59,6 @@ The platform processes student recruitment data across institutions, recruiters,
 
 | Layer | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Data Cleaning & Profiling** | PySpark / Python | Python 3.11, PySpark 3.5 | Raw schema inspection, data type validation, missingness profiling |
 | **Cloud Data Warehouse** | Snowflake | Standard Edition | Relational storage, internal staging `@STAGE_PLACEMENT`, RBAC, Dynamic Masking, Row Access Policies |
 | **Automated Ingestion** | Snowpipe | Serverless Pipes | Continuous auto-ingestion from internal stage via `ALTER PIPE ... REFRESH` |
 | **In-Warehouse Transformations** | dbt (dbt-core, dbt-snowflake) | 1.12.4 / 1.12.0 | Medallion pipelines, SCD Type 2 snapshots, Star Schema facts/dimensions |
@@ -98,12 +87,7 @@ StudentPlacementAnalysis/
 │   ├── placement_companies.csv         # Raw companies data (15 records)
 │   ├── placement_offers.csv            # Raw placement offers data (25 records)
 │   ├── placement_students.csv          # Raw students data (20 records)
-│   ├── student_placement_star_schema_diagram.png # Star Schema architectural entity diagram
-│   └── cleaned/                        # PySpark cleaned output CSVs
-│       ├── colleges.csv
-│       ├── companies.csv
-│       ├── offers.csv
-│       └── students.csv
+│   └── student_placement_star_schema_diagram.png # Star Schema architectural entity diagram
 │
 ├── dbt_project/                        # dbt transformation assets
 │   ├── macros/
@@ -131,8 +115,6 @@ StudentPlacementAnalysis/
 │   ├── snowflake_connection.py         # Standard connection factory
 │   ├── ingestion/
 │   │   └── load_bronze.py              # Snowpipe staging & loading with audit logging
-│   ├── pyspark/
-│   │   └── pipeline.py                 # PySpark data profiling, cleaning, and export
 │   ├── snowflake/
 │   │   └── setup_snowflake.py          # Database DDL initialization script
 │   └── validation/
@@ -343,19 +325,13 @@ python src/snowflake/setup_snowflake.py
 ```
 *Creates warehouse `PLACEMENT_WH`, database `PLACEMENT_DB`, schemas `BRONZE`, `SILVER`, `GOLD`, `OPS`, `SEM`, tables `OPS.LOAD_AUDIT` and `OPS.REJECTS`, internal landing stage `STAGE_PLACEMENT`, and 4 dedicated Snowpipes (`PIPE_RAW_STUDENTS`, `PIPE_RAW_COLLEGES`, `PIPE_RAW_COMPANIES`, `PIPE_RAW_OFFERS`).*
 
-### 4. Run PySpark Local Data Pipeline
-```bash
-python src/pyspark/pipeline.py
-```
-*Profiles and cleans raw CSVs, computing `CGPA_BAND` and saving validated outputs to `data/cleaned/`.*
-
-### 5. Ingest Raw Data into Bronze via Snowpipe
+### 4. Ingest Raw Data into Bronze via Snowpipe
 ```bash
 python src/ingestion/load_bronze.py
 ```
 *Stages the 4 source CSVs into internal stage `@STAGE_PLACEMENT` using `PUT`, triggers the 4 Snowpipes with `ALTER PIPE ... REFRESH`, and logs batch execution telemetry to `OPS.LOAD_AUDIT`.*
 
-### 6. Execute Native dbt Pipeline
+### 5. Execute Native dbt Pipeline
 Run dbt transformations and snapshots directly from the project root:
 ```bash
 dbt run
@@ -364,7 +340,7 @@ dbt test
 ```
 *Executes all staging views, intermediate cleaned tables, Gold Star Schema dimensions (with SCD Type 2 tracking), incremental merge Fact table, and Semantic analytical views directly from root without requiring folder flags.*
 
-### 7. Run Data Quality & End-to-End Tests
+### 6. Run Data Quality & End-to-End Tests
 ```bash
 # Execute the 14 automated data quality checks
 python src/validation/data_quality.py
@@ -373,7 +349,7 @@ python src/validation/data_quality.py
 python -m unittest tests/test_end_to_end.py
 ```
 
-### 8. Launch the Streamlit Dashboard
+### 7. Launch the Streamlit Dashboard
 ```bash
 streamlit run streamlit/app.py
 ```
